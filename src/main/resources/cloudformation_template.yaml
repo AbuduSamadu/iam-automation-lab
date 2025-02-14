@@ -4,7 +4,8 @@ Description: 'CloudFormation template to create IAM users, groups, and automate 
 Parameters:
   S3BucketName:
     Type: String
-    Description: Name of the S3 bucket to grant read access to the S3 group.
+    Default: mascot-s3-bucket-1234
+    Description: Name of the S3 bucket to grant read access to the S3 group and store the Lambda deployment package.
 
 Resources:
   # Secret for One-Time Password
@@ -105,11 +106,11 @@ Resources:
   NotificationLambdaFunction:
     Type: 'AWS::Lambda::Function'
     Properties:
-      Handler: 'com.example.lambda.NotificationLambda::handleRequest'
+      Handler: 'com.mascot.lambda.NotificationLambda::handleRequest'
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: 'my-lambda-deployment-bucket'
-        S3Key: 'notification-lambda.jar'
+        S3Bucket: !Ref S3BucketName # Use the same bucket for Lambda deployment
+        S3Key: 'Automation_iam_resource-1.0-SNAPSHOT.jar'
       Runtime: java11
       Timeout: 30
 
@@ -140,6 +141,7 @@ Resources:
                   - 'ssm:GetParameter'
                   - 'secretsmanager:GetSecretValue'
                   - 'events:PutEvents'
+                  - 's3:GetObject' # Add this permission to allow Lambda to fetch the deployment package
                 Resource: '*'
 
   # EventBridge Rule for New User Creation
@@ -171,9 +173,19 @@ Outputs:
   OTPSecretArn:
     Description: 'ARN of the One-Time Password Secret'
     Value: !Ref OTPSecret
+
   S3UserEmail:
     Description: 'Email of the S3 User'
     Value: !Ref S3UserEmailParameter
+
   EC2UserEmail:
     Description: 'Email of the EC2 User'
     Value: !Ref EC2UserEmailParameter
+
+  S3UserArn:
+    Description: 'ARN of the S3 User'
+    Value: !GetAtt S3User.Arn
+
+  EC2UserArn:
+    Description: 'ARN of the EC2 User'
+    Value: !GetAtt EC2User.Arn
