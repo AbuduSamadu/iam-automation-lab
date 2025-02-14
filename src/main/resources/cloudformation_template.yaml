@@ -5,10 +5,6 @@ Parameters:
   S3BucketName:
     Type: String
     Description: Name of the S3 bucket to grant read access to the S3 group.
-  EC2Region:
-    Type: String
-    Default: us-east-1
-    Description: Region where EC2 resources are located.
 
 Resources:
   # Secret for One-Time Password
@@ -112,7 +108,7 @@ Resources:
       Handler: 'com.example.lambda.NotificationLambda::handleRequest'
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: 'your-lambda-deployment-bucket'
+        S3Bucket: 'my-lambda-deployment-bucket'
         S3Key: 'notification-lambda.jar'
       Runtime: java11
       Timeout: 30
@@ -143,6 +139,7 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                   - 'secretsmanager:GetSecretValue'
+                  - 'events:PutEvents'
                 Resource: '*'
 
   # EventBridge Rule for New User Creation
@@ -160,6 +157,15 @@ Resources:
       Targets:
         - Arn: !GetAtt NotificationLambdaFunction.Arn
           Id: 'TargetFunctionV1'
+
+  # Lambda Permission for EventBridge
+  LambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt NotificationLambdaFunction.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt NewUserCreationRule.Arn
 
 Outputs:
   OTPSecretArn:
