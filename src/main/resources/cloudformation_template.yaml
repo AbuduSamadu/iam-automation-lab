@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template to create IAM users, groups, and automate notifications.'
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket to grant read access to the S3 group.
+  EC2Region:
+    Type: String
+    Default: us-east-1
+    Description: Region where EC2 resources are located.
+
+Resources:
+  # Secret for One-Time Password
+  OTPSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Description: 'One-Time Password for all users'
+      GenerateSecretString:
+        SecretStringTemplate: '{"password": ""}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  # S3 User Group
+  S3UserGroup:
+    Type: 'AWS::IAM::Group'
+    Properties:
+      GroupName: 'S3UserGroup'
+
+  # EC2 User Group
+  EC2UserGroup:
+    Type: 'AWS::IAM::Group'
+    Properties:
+      GroupName: 'EC2UserGroup'
+
+  # S3 Read Policy for S3 User Group
+  S3ReadPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: 'S3ReadAccess'
+      Groups:
+        - !Ref S3UserGroup
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+              - 's3:ListBucket'
+            Resource:
+              - !Sub 'arn:aws:s3:::${S3BucketName}'
+              - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+
+  # EC2 Read Policy for EC2 User Group
+  EC2ReadPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: 'EC2ReadAccess'
+      Groups:
+        - !Ref EC2UserGroup
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeRegions'
+            Resource: '*'
+
+  # IAM User for S3 Access
+  S3User:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: 's3-user'
+      Groups:
+        - !Ref S3UserGroup
+      LoginProfile:
+        Password: !Join ['', ['{{resolve:secretsmanager:', !Ref OTPSecret, ':SecretString:password}}']]
+        PasswordResetRequired: true
+
+  # IAM User for EC2 Access
+  EC2User:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: 'ec2-user'
+      Groups:
+        - !Ref EC2UserGroup
+      LoginProfile:
+        Password: !Join ['', ['{{resolve:secretsmanager:', !Ref OTPSecret, ':SecretString:password}}']]
+        PasswordResetRequired: true
+
+  # Parameter Store for User Emails
+  S3UserEmailParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: '/user/s3-user/email'
+      Type: String
+      Value: 's3-user@example.com'
+
+  EC2UserEmailParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Name: '/user/ec2-user/email'
+      Type: String
+      Value: 'ec2-user@example.com'
+
+  # Lambda Function to Handle New User Notifications
+  NotificationLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: 'com.example.lambda.NotificationLambda::handleRequest'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: 'your-lambda-deployment-bucket'
+        S3Key: 'notification-lambda.jar'
+      Runtime: java11
+      Timeout: 30
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'secretsmanager:GetSecretValue'
+                Resource: '*'
+
+  # EventBridge Rule for New User Creation
+  NewUserCreationRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      EventPattern:
+        source:
+          - aws.iam
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventName:
+            - CreateUser
+      Targets:
+        - Arn: !GetAtt NotificationLambdaFunction.Arn
+          Id: 'TargetFunctionV1'
+
+Outputs:
+  OTPSecretArn:
+    Description: 'ARN of the One-Time Password Secret'
+    Value: !Ref OTPSecret
+  S3UserEmail:
+    Description: 'Email of the S3 User'
+    Value: !Ref S3UserEmailParameter
+  EC2UserEmail:
+    Description: 'Email of the EC2 User'
+    Value: !Ref EC2UserEmailParameter
