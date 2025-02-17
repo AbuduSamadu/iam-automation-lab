@@ -143,8 +143,9 @@ Resources:
                   - 'secretsmanager:GetSecretValue'
                   - 'events:PutEvents'
                   - 's3:GetObject' # Add this permission to allow Lambda to fetch the deployment package
-                Resource: '*'
-
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/user/*'
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*-password'
   # EventBridge Rule for New User Creation
   NewUserCreationRule:
     Type: 'AWS::Events::Rule'
