@@ -7,27 +7,28 @@ import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import java.util.Map;
 
 public class NotificationLambda implements RequestHandler<Map<String, Object>, String> {
-
     @Override
     public String handleRequest(Map<String, Object> input, Context context) {
         try {
             // Extract the username from the event
             String username = getUsernameFromEvent(input);
 
-            // Retrieve user email and password concurrently
-            long startTime = System.currentTimeMillis();
+            // Retrieve user email from Parameter Store
             String email = retrieveUserEmail(username);
-            long emailTime = System.currentTimeMillis() - startTime;
+            if ("Email not found".equals(email)) {
+                context.getLogger().log("Warning: Email not found for user " + username);
+            }
 
-            startTime = System.currentTimeMillis();
+            // Retrieve OTP from Secrets Manager
             String password = retrieveUserPassword(username);
-            long passwordTime = System.currentTimeMillis() - startTime;
+            if ("Password not found".equals(password)) {
+                context.getLogger().log("Warning: Password not found for user " + username);
+            }
 
             // Log the information
             context.getLogger().log("New user created: " + username);
-            context.getLogger().log("Email: " + email + ", Temporary Password: " + password);
-            context.getLogger().log("Time taken to retrieve email: " + emailTime + " ms");
-            context.getLogger().log("Time taken to retrieve password: " + passwordTime + " ms");
+            context.getLogger().log("Email: " + email);
+            context.getLogger().log("Temporary Password: " + password);
 
             return "Notification processed successfully!";
         } catch (Exception e) {

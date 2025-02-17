@@ -98,7 +98,7 @@ public class LoginController {
 
     public static void main(String[] args) {
         LoginController controller = new LoginController();
-        controller.createIamUser("s3-user-4", "S3UserGroup", "s3-user@example.com");
-        controller.createIamUser("ec2-user-4", "EC2UserGroup", "ec2-user@example.com");
+        controller.createIamUser("s3-user-5", "S3UserGroup", "s3-user@example.com");
+        controller.createIamUser("ec2-user-5", "EC2UserGroup", "ec2-user@example.com");
     }
 }
