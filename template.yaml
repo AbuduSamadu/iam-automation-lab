@@ -1,0 +1,4 @@
+template-file-path: cloudformation_template.yaml
+parameters:
+  S3BucketName: mascot-s3-bucket-1234
+tags: {}
