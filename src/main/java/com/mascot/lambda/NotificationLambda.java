@@ -6,27 +6,28 @@ import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import java.util.Map;
 
-import static software.amazon.awssdk.services.secretsmanager.SecretsManagerClient.*;
-
 public class NotificationLambda implements RequestHandler<Map<String, Object>, String> {
 
     @Override
     public String handleRequest(Map<String, Object> input, Context context) {
         try {
-            context.getLogger().log("Received event: " + input.toString());
-
             // Extract the username from the event
             String username = getUsernameFromEvent(input);
 
-            // Retrieve user email from Parameter Store
+            // Retrieve user email and password concurrently
+            long startTime = System.currentTimeMillis();
             String email = retrieveUserEmail(username);
+            long emailTime = System.currentTimeMillis() - startTime;
 
-            // Retrieve OTP from Secrets Manager
+            startTime = System.currentTimeMillis();
             String password = retrieveUserPassword(username);
+            long passwordTime = System.currentTimeMillis() - startTime;
 
             // Log the information
             context.getLogger().log("New user created: " + username);
             context.getLogger().log("Email: " + email + ", Temporary Password: " + password);
+            context.getLogger().log("Time taken to retrieve email: " + emailTime + " ms");
+            context.getLogger().log("Time taken to retrieve password: " + passwordTime + " ms");
 
             return "Notification processed successfully!";
         } catch (Exception e) {
@@ -37,7 +38,7 @@ public class NotificationLambda implements RequestHandler<Map<String, Object>, S
 
     private String getUsernameFromEvent(Map<String, Object> event) {
         Map<String, Object> detail = (Map<String, Object>) event.get("detail");
-        if (detail == null) {
+        if (detail == null || !(detail instanceof Map)) {
             throw new IllegalArgumentException("Invalid event structure: 'detail' is not a map.");
         }
 
@@ -59,7 +60,7 @@ public class NotificationLambda implements RequestHandler<Map<String, Object>, S
     }
 
     private String retrieveUserPassword(String username) {
-        SecretsManagerClient secretsManagerClient = create();
+        SecretsManagerClient secretsManagerClient = SecretsManagerClient.create();
         try {
             return secretsManagerClient.getSecretValue(request -> request.secretId(username + "-password")).secretString();
         } catch (Exception e) {

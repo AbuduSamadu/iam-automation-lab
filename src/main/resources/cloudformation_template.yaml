@@ -111,8 +111,9 @@ Resources:
       Code:
         S3Bucket: !Ref S3BucketName # Use the same bucket for Lambda deployment
         S3Key: 'Automation_iam_resource-1.0-SNAPSHOT.jar'
-      Runtime: java11
-      Timeout: 30
+      Runtime: java17
+      Timeout: 60
+      MemorySize: 256
 
   # Lambda Execution Role
   LambdaExecutionRole:
