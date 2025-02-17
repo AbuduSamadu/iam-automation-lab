@@ -6,6 +6,8 @@ import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import java.util.Map;
 
+import static software.amazon.awssdk.services.secretsmanager.SecretsManagerClient.*;
+
 public class NotificationLambda implements RequestHandler<Map<String, Object>, String> {
 
     @Override
@@ -35,7 +37,7 @@ public class NotificationLambda implements RequestHandler<Map<String, Object>, S
 
     private String getUsernameFromEvent(Map<String, Object> event) {
         Map<String, Object> detail = (Map<String, Object>) event.get("detail");
-        if (detail == null || !(detail instanceof Map)) {
+        if (detail == null) {
             throw new IllegalArgumentException("Invalid event structure: 'detail' is not a map.");
         }
 
@@ -57,7 +59,7 @@ public class NotificationLambda implements RequestHandler<Map<String, Object>, S
     }
 
     private String retrieveUserPassword(String username) {
-        SecretsManagerClient secretsManagerClient = SecretsManagerClient.create();
+        SecretsManagerClient secretsManagerClient = create();
         try {
             return secretsManagerClient.getSecretValue(request -> request.secretId(username + "-password")).secretString();
         } catch (Exception e) {
